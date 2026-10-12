@@ -91,12 +91,7 @@ function finishSampling() {
 function showHumanOverlay() {
   var overlay = document.createElement('div');
   overlay.id = 'human-overlay';
-  overlay.innerHTML = '<div id="human-box">
-  <h2 style="margin:0 0 8px 0">Just one more step</h2>
-  <p style="margin:0 0 12px 0">Click the button below to confirm you are human and then perform a short drag gesture.</p>
-  <button id="confirm-btn">I am human</button>
-  <div id="drag-hint">Then press and drag anywhere on the page for at least ' + config.minDragDistance + ' pixels.</div>
-</div>';
+  overlay.innerHTML = '<div id="human-box">' + '<h2 style="margin:0 0 8px 0">Just one more step</h2>' + '<p style="margin:0 0 12px 0">Click the button below to confirm you are human and then perform a short drag gesture.</p>' + '<button id="confirm-btn">I am human</button>' + '<div id="drag-hint">Then press and drag anywhere on the page for at least ' + config.minDragDistance + ' pixels.</div>' + '</div>';
   document.documentElement.appendChild(overlay);
   var btn = document.getElementById('confirm-btn');
   btn.addEventListener('click', function(){ gotClickConfirm = true; overlay.remove(); });
