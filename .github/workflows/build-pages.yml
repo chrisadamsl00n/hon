@@ -22,7 +22,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: 'npm'
 
       - name: Install dependencies
         run: npm install
@@ -43,13 +42,11 @@ jobs:
             git fetch origin gh-pages:gh-pages
           fi
 
-          # create a clean gh-pages branch and copy the generated site
           git checkout --orphan gh-pages || git checkout gh-pages
           git rm -rf . > /dev/null 2>&1 || true
 
           cp -R publish/. .
 
-          # write robots.txt via printf to avoid YAML heredoc indentation issues
           printf 'User-agent: *\nDisallow: /n1.html\n' > robots.txt
 
           git add -A
