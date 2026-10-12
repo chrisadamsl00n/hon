@@ -1,0 +1,11 @@
+{
+  "name": "static-obfuscator",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "node scripts/build.js --src n1.html --out publish/index.html --next next.js"
+  },
+  "dependencies": {
+    "minimist": "^1.2.8",
+    "lz-string": "^1.4.4"
+  }
+}
