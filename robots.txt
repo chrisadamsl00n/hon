@@ -1,0 +1,2 @@
+User-agent: *
+Disallow: /n1.html
